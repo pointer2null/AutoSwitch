@@ -165,6 +165,7 @@ void loop(){
     // count down slow
     thresholdCount--;
   }
+
   if (watch) {
     valuesDump();
   }
@@ -189,6 +190,7 @@ void loop(){
   //serial.write(serial.read());
   serial_commands_.ReadSerial();
 }
+
 
 void valuesDump() {
   serial.print("\r\nValue = ");
