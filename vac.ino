@@ -41,11 +41,11 @@ void loop()
     // count down slow
     thresholdCount--;
   }
-  serialDump(analogValue, thresholdCount);
+  serialDump();
   if (thresholdCount > triggerLevel) {
     digitalWrite(blinkPin, HIGH);
     digitalWrite(relay, HIGH);
-    
+    blink = false;
   } else {
     digitalWrite(relay, LOW);
     digitalWrite(blinkPin, LOW);
@@ -63,10 +63,10 @@ void loop()
 
 }
 
-void serialDump(int val, int th) {
+void serialDump() {
   serial.print("\r                               ");
   serial.print("\rValue = ");
-  serial.print(val, DEC);
+  serial.print(analogValue, DEC);
   serial.print(" ThCnt = ");
-  serial.print(th, DEC);
+  serial.print(thresholdCount, DEC);
 }
