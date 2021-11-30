@@ -2,6 +2,7 @@
 #include "SerialCommands.h"
 #include <SoftwareSerial.h>
 #include <EEPROM.h>
+#include <Time.h>
 
 
 #define blinkPin 0                     // pin 5, PB0
@@ -22,6 +23,11 @@ int thresholdCount    = 0;             // counter
 
 boolean blink = false;
 boolean watch = false;
+
+long now           = 0;
+long nextBlink     = 0;
+long blinkLengthMs = 500; 
+bool blinkLed      = true;
 
 char serial_command_buffer_[32];
 struct Data {
@@ -180,14 +186,13 @@ void loop(){
     // thresholdCount = 0;
   }
   if (blink) {
-    digitalWrite(blinkPin, HIGH);
-    delay(500);
-    digitalWrite(blinkPin, LOW);
-    delay(500);
-  } else {
-    delay(1000);
-  }
-  //serial.write(serial.read());
+    now = millis();
+    if (now > nextBlink) {
+      nextBlink = now + blinkLengthMs;
+    }
+    digitalWrite(blinkPin, blinkLed);
+    blinkLed = !blinkLed;
+  } 
   serial_commands_.ReadSerial();
 }
 
