@@ -57,10 +57,11 @@ void cmd_unrecognized(SerialCommands* sender, const char* cmd){
 
 void useage() {
   serial.println(F("\r\n\n******GVac switch.******\r\n"));
-  serial.println(F("set <n> : set the current threshold"));
-  serial.println(F("get     : get the current threshold"));
-  serial.println(F("watch   : watch the current sensor value"));
-  serial.println(F("cal     : auto set the current threshold"));
+  serial.println(F("set <n>  : set the current threshold"));
+  serial.println(F("get      : get the current threshold"));
+  serial.println(F("watch    : watch the current sensor value"));
+  serial.println(F("cal      : auto set the current threshold"));
+  serial.println(F("hold <n> : set the hold value (6 - 20, default 10)"));
 }
 
 //called for set command
@@ -117,12 +118,30 @@ void cmd_cal(SerialCommands* sender){
   useage();
 }
 
+void cmd_sethold(SerialCommands* sender){
+  watch = false;
+  char* valStr = sender->Next();
+  if (valStr == NULL){
+    useage();
+    return;
+  }
+
+  int val = atoi(valStr);
+  if (val < defaultTriggerLevel || val > 20){
+    useage();
+    return;
+  }
+  d.thresholdCountMax = val;
+  EEPROM.put(0, d);
+}
+
 //Note: Commands are case sensitive
 SerialCommand cmd_set_("set", cmd_set);
 SerialCommand cmd_get_("get", cmd_get);
 SerialCommand cmd_watch_("watch", cmd_watch);
 SerialCommand cmd_stop_watch_("x", cmd_stop_watch, true);
 SerialCommand cmd_cal_("cal", cmd_cal);
+SerialCommand cmd_sethold_("hold", cmd_sethold);
 
  
 
@@ -139,6 +158,7 @@ void setup(){
   serial_commands_.AddCommand(&cmd_watch_);
   serial_commands_.AddCommand(&cmd_stop_watch_);
   serial_commands_.AddCommand(&cmd_cal_);
+  serial_commands_.AddCommand(&cmd_sethold_);
   
   // check eeprom - see if we've been initialized before
   EEPROM.get(0, d);
