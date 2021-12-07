@@ -47,7 +47,7 @@ SoftwareSerial serial(serialRX, serialTX);
 SerialCommands serial_commands_(&serial, serial_command_buffer_, sizeof(serial_command_buffer_), "\r", " ");
 
 void valuesHeader() {
-  serial.print(F("\r\n\n\nAnalog\tAnalog\t\tThreshold\tOn trigger\tOff trigger\tCounter"));
+  serial.print(F("\r\n\nAnalog\tAnalog\t\tThreshold\tOn trigger\tOff trigger\tCounter"));
   serial.print(F("\r\nvalue\tthreshold\tcounter\t\tlevel\t\tlevel\t\tmax\r\n"));
 }
 
@@ -80,13 +80,14 @@ void useage() {
   serial.println(F("\r\n\n******GVac switch.******\r\n"));
   serial.println(F("get      : get config values"));
   serial.println(F("set <n>  : set the tool current threshold value"));
+  serial.println(F("def      : set the default values"));
   serial.println(F("cal      : auto set the current threshold"));
   serial.print  (F("on <n>   : set the on trigger value (0 - "));
   serial.print(defaultThresholdCountMax, DEC);
-  serial.println(F(", must be less than off value)")); 
+  serial.println(F(", must be less than off value)"));
   serial.print  (F("off <n>  : set the off trigger value (0 - "));
   serial.print(defaultThresholdCountMax, DEC);
-  serial.println(F(", must be more than on value)")); 
+  serial.println(F(", must be more than on value)"));
   serial.println(F("watch    : watch the hall current sensor output value"));
 }
 
@@ -190,6 +191,13 @@ void cmd_setOff(SerialCommands* sender) {
   useage();
 }
 
+void cmd_setDef(SerialCommands* sender) {
+  setDefaults();
+  valuesHeader();
+  valuesDump();
+  useage();
+}
+
 //Note: Commands are case sensitive
 SerialCommand cmd_set_("set", cmd_set);
 SerialCommand cmd_get_("get", cmd_get);
@@ -198,6 +206,7 @@ SerialCommand cmd_stop_watch_("x", cmd_stop_watch, true);
 SerialCommand cmd_cal_("cal", cmd_cal);
 SerialCommand cmd_setOn_("on", cmd_setOn);
 SerialCommand cmd_setOff_("off", cmd_setOff);
+SerialCommand cmd_setDef_("def", cmd_setDef);
 
 
 
@@ -215,6 +224,8 @@ void setup() {
   serial_commands_.AddCommand(&cmd_stop_watch_);
   serial_commands_.AddCommand(&cmd_cal_);
   serial_commands_.AddCommand(&cmd_setOn_);
+  serial_commands_.AddCommand(&cmd_setOff_);
+  serial_commands_.AddCommand(&cmd_setDef_);
 
   // check eeprom - see if we've been initialized before
   EEPROM.get(0, d);
@@ -222,16 +233,22 @@ void setup() {
     serial.print(F("First run, using defaults.\r\n"));
     // this is the first ever run
     // set defaults
-    d.magic[0]          = 'G';
-    d.thresholdCountMax = defaultThresholdCountMax;
-    d.thresholdOn       = defaultThresholdOn;
-    d.thresholdOff      = defaultThresholdOff;
-    d.thresholdRate     = defaultThresholdRate;
-    d.adcThreshold      = defaultCurrentThreshold;
-    EEPROM.put(0, d);
+    setDefaults();
   } else {
     serial.print(F("Program data loaded.\r\n"));
   }
+  valuesHeader();
+  valuesDump();
+}
+
+void setDefaults() {
+  d.magic[0]          = 'G';
+  d.thresholdCountMax = defaultThresholdCountMax;
+  d.thresholdOn       = defaultThresholdOn;
+  d.thresholdOff      = defaultThresholdOff;
+  d.thresholdRate     = defaultThresholdRate;
+  d.adcThreshold      = defaultCurrentThreshold;
+  EEPROM.put(0, d);
 }
 
 void loop() {
