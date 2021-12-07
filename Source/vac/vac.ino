@@ -12,28 +12,29 @@
 #define sense    A1                    // pin 7, PB2, ADC1
 
 #define defaultThresholdRate     2     // how fast we climb when over the trigger level
-#define defaultThreshold         600   // ADC trigger level
-#define defaultThresholdCountMax 10    // max counter value - affects how long we stay on after the tool is off
-#define defaultTriggerLevel      6     // count point to switch on
+#define defaultCurrentThreshold         600   // ADC trigger level
+#define defaultThresholdCountMax 20    // max counter value - affects how long we stay on after the tool is off
+#define defaultTriggerLevel      12    // count point to switch on
 
 #define calPeriodMs              10000 // 10 seconds
- 
+#define countPeriodMs            750   // 3/4 second
+
 int analogValue       = 0;             // hall sensor value
-int thresholdCount    = 0;             // counter       
+int thresholdCount    = 0;             // counter
 
 boolean blink = false;
 boolean watch = false;
 
 long now           = 0;
-long nextBlink     = 0;
-long blinkLengthMs = 500; 
+long lastCheck     = 0;
+long checkPeriodMs = 500;
 bool blinkLed      = true;
 
 char serial_command_buffer_[32];
 struct Data {
   char magic[1];                       // need some way to see if the eeprom has been initialized
   int thresholdRate;                   // how fast we climb when over the current trigger level
-  int threshold;                       // ADC current trigger level
+  int adcThreshold;                    // ADC current trigger level
   int thresholdCountMax;               // max counter value - affects how long we stay on after the tool is off
   int triggerLevel;                    // counter trigger level that turns on vac
 };
@@ -45,9 +46,9 @@ SoftwareSerial serial(serialRX, serialTX);
 SerialCommands serial_commands_(&serial, serial_command_buffer_, sizeof(serial_command_buffer_), "\r", " ");
 
 
-//This is the default handler, and gets called when no other command matches. 
+//This is the default handler, and gets called when no other command matches.
 // note the F() macro stores the const strings in flash to same ram
-void cmd_unrecognized(SerialCommands* sender, const char* cmd){
+void cmd_unrecognized(SerialCommands* sender, const char* cmd) {
   watch = false;
   sender->GetSerial()->print(F("Unrecognized command ["));
   sender->GetSerial()->print(cmd);
@@ -57,54 +58,56 @@ void cmd_unrecognized(SerialCommands* sender, const char* cmd){
 
 void useage() {
   serial.println(F("\r\n\n******GVac switch.******\r\n"));
-  serial.println(F("set <n>  : set the current threshold"));
-  serial.println(F("get      : get the current threshold"));
-  serial.println(F("watch    : watch the current sensor value"));
+  serial.println(F("set <n>  : set the tool current threshold value"));
+  serial.println(F("get      : get the tool current threshold value"));
+  serial.println(F("watch    : watch the hall current sensor output value"));
   serial.println(F("cal      : auto set the current threshold"));
-  serial.println(F("hold <n> : set the hold value (6 - 20, default 10)"));
+  serial.print(F("hold <n> : set the hold value (6 - "));
+  serial.print(defaultThresholdCountMax, DEC);
+  serial.println(F(", default 10)"));
 }
 
 //called for set command
-void cmd_set(SerialCommands* sender){
+void cmd_set(SerialCommands* sender) {
   watch = false;
   char* valStr = sender->Next();
-  if (valStr == NULL){
+  if (valStr == NULL) {
     useage();
     return;
   }
 
   int val = atoi(valStr);
-  d.threshold = val;
+  d.adcThreshold = val;
   EEPROM.put(0, d);
 }
 
 //called for get command
-void cmd_get(SerialCommands* sender){
+void cmd_get(SerialCommands* sender) {
   watch = false;
   sender->GetSerial()->print(F("Current sensor threshold:"));
-  sender->GetSerial()->println(d.threshold);
+  sender->GetSerial()->println(d.adcThreshold);
   useage();
 }
 
 //called for watch command
-void cmd_watch(SerialCommands* sender){
+void cmd_watch(SerialCommands* sender) {
   sender->GetSerial()->println(F("Current sensor values. "));
   sender->GetSerial()->println(F("** Press x to stop. **"));
   watch = true;
 }
 
-void cmd_stop_watch(SerialCommands* sender){
+void cmd_stop_watch(SerialCommands* sender) {
   watch = false;
   useage();
 }
 
-void cmd_cal(SerialCommands* sender){
+void cmd_cal(SerialCommands* sender) {
   watch = false;
   sender->GetSerial()->println(F("calibrating: do not switch on load..."));
   int calVal = 0;
   unsigned long stopwatch = millis(); // Store a snapshot of the current time since the program started executing
   // Collect the max ADC value from the current sensor for the predetermined sample period
-  while(millis() - stopwatch < calPeriodMs) { 
+  while (millis() - stopwatch < calPeriodMs) {
     calVal = max(calVal, analogRead(sense));
     sender->GetSerial()->print(".");
     delay(250);
@@ -113,21 +116,21 @@ void cmd_cal(SerialCommands* sender){
   sender->GetSerial()->print(F("\r\nComplete. New value is ["));
   sender->GetSerial()->print(calVal);
   sender->GetSerial()->println(F("]"));
-  d.threshold = calVal;
+  d.adcThreshold = calVal;
   EEPROM.put(0, d);
   useage();
 }
 
-void cmd_sethold(SerialCommands* sender){
+void cmd_sethold(SerialCommands* sender) {
   watch = false;
   char* valStr = sender->Next();
-  if (valStr == NULL){
+  if (valStr == NULL) {
     useage();
     return;
   }
 
   int val = atoi(valStr);
-  if (val < defaultTriggerLevel || val > 20){
+  if (val < defaultTriggerLevel || val > defaultThresholdCountMax) {
     useage();
     return;
   }
@@ -143,9 +146,9 @@ SerialCommand cmd_stop_watch_("x", cmd_stop_watch, true);
 SerialCommand cmd_cal_("cal", cmd_cal);
 SerialCommand cmd_sethold_("hold", cmd_sethold);
 
- 
 
-void setup(){
+
+void setup() {
   serial.begin(9600);
   serial.print(F("\r\n******GVac switch.******\r\n"));
   useage();
@@ -159,10 +162,10 @@ void setup(){
   serial_commands_.AddCommand(&cmd_stop_watch_);
   serial_commands_.AddCommand(&cmd_cal_);
   serial_commands_.AddCommand(&cmd_sethold_);
-  
+
   // check eeprom - see if we've been initialized before
   EEPROM.get(0, d);
-  if (d.magic[0] != 'G'){
+  if (d.magic[0] != 'G') {
     serial.print(F("First run, using defaults.\r\n"));
     // this is the first ever run
     // set defaults
@@ -170,54 +173,74 @@ void setup(){
     d.thresholdCountMax = defaultThresholdCountMax;
     d.triggerLevel      = defaultTriggerLevel;
     d.thresholdRate     = defaultThresholdRate;
-    d.threshold         = defaultThreshold;
+    d.adcThreshold      = defaultCurrentThreshold;
     EEPROM.put(0, d);
   } else {
     serial.print(F("Program data loaded.\r\n"));
   }
 }
 
-void loop(){
-  analogValue = analogRead(sense);
-  if ((analogValue >= d.threshold) &&
-      (thresholdCount <= d.thresholdCountMax)) {
-    // count up fast
-    thresholdCount += d.thresholdRate;
-    blink = true;
-  } else {
-    blink = false;
+void loop() {
+  now = millis();
+  // check every 500ms
+  if (lastCheck + checkPeriodMs < now) {
+    periodicCheck();
+    lastCheck = now;
   }
-  if ((analogValue < d.threshold) && (thresholdCount > 0 )) {
+  serial_commands_.ReadSerial();
+
+}
+
+void periodicCheck() {
+  analogValue = analogRead(sense);
+  if (watch) {
+    valuesDump();
+  }
+
+  if ((analogValue >= d.adcThreshold) &&
+      (thresholdCount <= d.thresholdCountMax)) {
+    // switching on - over trigger level, increase counter
+    thresholdCount += d.thresholdRate;
+    blink = true; // start blink to show tool is on
+  }
+  if ((analogValue < d.adcThreshold) && (thresholdCount > 0 )) {
+    // current sense is below trigger
+    blink = false;
     // count down slow
     thresholdCount--;
   }
 
-  if (watch) {
-    valuesDump();
-  }
   if (thresholdCount > d.triggerLevel) {
-    digitalWrite(blinkPin, HIGH);
+    // switch on
     digitalWrite(relay, HIGH);
-    blink = false;
-  } else {
+    digitalWrite(blinkPin, HIGH);
+    blinkLed = true;
+    blink = false; // cancel blink as we've switched on
+  }
+
+  if ((thresholdCount < d.triggerLevel) && (analogValue < d.adcThreshold)) {
+    // switch off
     digitalWrite(relay, LOW);
-    digitalWrite(blinkPin, LOW);
-    // if we want some positive feedback for a clean switch off, uncomment the line below
-    // thresholdCount = 0;
+    blink = false;
+    blinkLed = false;
+    // positive feedback for a clean switch off
+    thresholdCount = 0;
   }
   if (blink) {
-    now = millis();
-    if (now > nextBlink) {
-      nextBlink = now + blinkLengthMs;
-    }
-    digitalWrite(blinkPin, blinkLed);
     blinkLed = !blinkLed;
-  } 
-  serial_commands_.ReadSerial();
+  }
+
+  digitalWrite(blinkPin, blinkLed);
 }
 
 
 void valuesDump() {
-  serial.print("\r\nValue = ");
+  serial.print(F("\r\nCurrent = "));
   serial.print(analogValue, DEC);
+  serial.print(F(" Current threshold = "));
+  serial.print(d.adcThreshold, DEC);
+  serial.print(F(" thresholdCount = "));
+  serial.print(thresholdCount, DEC);
+  serial.print(F(" triggerLevel = "));
+  serial.print(d.triggerLevel, DEC);
 }
