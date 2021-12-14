@@ -25,6 +25,7 @@ int thresholdCount    = 0;             // counter
 
 boolean blink = false;
 boolean watch = false;
+boolean force = false;
 
 long now           = 0;
 long lastCheck     = 0;
@@ -198,6 +199,20 @@ void cmd_setDef(SerialCommands* sender) {
   useage();
 }
 
+void cmd_setFOff(SerialCommands* sender) {
+  force = false;
+  valuesHeader();
+  valuesDump();
+  useage();
+}
+
+void cmd_setFOn(SerialCommands* sender) {
+  force = true;
+  valuesHeader();
+  valuesDump();
+  useage();
+}
+
 //Note: Commands are case sensitive
 SerialCommand cmd_set_("set", cmd_set);
 SerialCommand cmd_get_("get", cmd_get);
@@ -207,7 +222,8 @@ SerialCommand cmd_cal_("cal", cmd_cal);
 SerialCommand cmd_setOn_("on", cmd_setOn);
 SerialCommand cmd_setOff_("off", cmd_setOff);
 SerialCommand cmd_setDef_("def", cmd_setDef);
-
+SerialCommand cmd_setFOn_("fon", cmd_setFOn);
+SerialCommand cmd_setFOff_("foff", cmd_setFOff);
 
 
 void setup() {
@@ -226,6 +242,8 @@ void setup() {
   serial_commands_.AddCommand(&cmd_setOn_);
   serial_commands_.AddCommand(&cmd_setOff_);
   serial_commands_.AddCommand(&cmd_setDef_);
+  serial_commands_.AddCommand(&cmd_setFOn_);
+  serial_commands_.AddCommand(&cmd_setFOff_);
 
   // check eeprom - see if we've been initialized before
   EEPROM.get(0, d);
@@ -254,12 +272,15 @@ void setDefaults() {
 void loop() {
   now = millis();
   // check every 500ms
-  if (lastCheck + checkPeriodMs < now) {
+  if (force) {
+    // set everything on
+    digitalWrite(relay, HIGH);
+    digitalWrite(blinkPin, HIGH);
+  } else if (lastCheck + checkPeriodMs < now) {
     periodicCheck();
     lastCheck = now;
   }
   serial_commands_.ReadSerial();
-
 }
 
 void periodicCheck() {
