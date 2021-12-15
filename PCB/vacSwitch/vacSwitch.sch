@@ -425,9 +425,9 @@ Wire Wire Line
 Connection ~ 8100 2900
 Wire Wire Line
 	8100 2900 7650 2900
-Text GLabel 9050 2150 2    50   Input ~ 0
-HOT
 Text GLabel 9050 2900 2    50   Input ~ 0
+HOT
+Text GLabel 9050 2150 2    50   Input ~ 0
 VAC
 Wire Wire Line
 	8500 2150 9050 2150
