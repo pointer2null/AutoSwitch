@@ -16,9 +16,9 @@
 #define defaultThresholdCountMax 20    // max counter value - affects how long we stay on after the tool is off
 #define defaultThresholdOn       6     // count point to switch on
 #define defaultThresholdOff      10    // count point to switch on
+#define defaultCheckPeriodMs     500   // loop poll frequency
 
 #define calPeriodMs              10000 // 10 seconds
-#define countPeriodMs            750   // 3/4 second
 
 int analogValue       = 0;             // hall sensor value
 int thresholdCount    = 0;             // counter
@@ -29,7 +29,7 @@ boolean force = false;
 
 long now           = 0;
 long lastCheck     = 0;
-long checkPeriodMs = 500;
+
 bool blinkLed      = true;
 
 char serial_command_buffer_[32];
@@ -40,6 +40,7 @@ struct Data {
   int thresholdCountMax;               // max counter value - affects how long we stay on after the tool is off
   int thresholdOn;                     // counter trigger level that turns on vac
   int thresholdOff;
+  long checkPeriodMs;
 };
 
 Data d;
@@ -67,6 +68,26 @@ void valuesDump() {
   serial.print(F("\r\n"));
 }
 
+
+void useage() {
+  serial.println(F("\r\n\n******GVac switch.******\r\n"));
+  serial.println(F("get          : get all config values"));
+  serial.println(F("current [n]  : get or set the tool current threshold value"));
+  serial.println(F("on [n]       : get or set the on trigger value"));
+  serial.println(F("off [n]      : get or set the off trigger value"));
+  serial.println(F("count [n]    : get or set the max count value"));
+  serial.println(F("period [n]   : get or set the poll period (ms)"));
+
+  
+  serial.println(F("def          : set the default values"));
+  serial.println(F("cal          : auto set the current threshold"));
+  serial.println(F("watch        : watch the current system values (x to stop)"));
+  serial.println(F("f<on|off>    : force switch on/off"));
+}
+
+//*** seial commands ***
+//Note: Commands are case sensitive
+
 //This is the default handler, and gets called when no other command matches.
 // note the F() macro stores the const strings in flash to same ram
 void cmd_unrecognized(SerialCommands* sender, const char* cmd) {
@@ -77,26 +98,22 @@ void cmd_unrecognized(SerialCommands* sender, const char* cmd) {
   useage();
 }
 
-void useage() {
-  serial.println(F("\r\n\n******GVac switch.******\r\n"));
-  serial.println(F("get      : get config values"));
-  serial.println(F("set <n>  : set the tool current threshold value"));
-  serial.println(F("def      : set the default values"));
-  serial.println(F("cal      : auto set the current threshold"));
-  serial.print  (F("on <n>   : set the on trigger value (0 - "));
-  serial.print(defaultThresholdCountMax, DEC);
-  serial.println(F(", must be less than off value)"));
-  serial.print  (F("off <n>  : set the off trigger value (0 - "));
-  serial.print(defaultThresholdCountMax, DEC);
-  serial.println(F(", must be more than on value)"));
-  serial.println(F("watch    : watch the hall current sensor output value"));
+//get command : display current settings
+void cmd_get(SerialCommands* sender) {
+  watch = false;
+  valuesHeader();
+  valuesDump();
+  useage();
 }
+SerialCommand cmd_get_("get", cmd_get);
 
-//called for set command
-void cmd_set(SerialCommands* sender) {
+//set command : get/set the adc current threshold
+void cmd_current(SerialCommands* sender) {
   watch = false;
   char* valStr = sender->Next();
   if (valStr == NULL) {
+    sender->GetSerial()->print(F("Current sensor threshold: "));
+    sender->GetSerial()->println(d.adcThreshold, DEC);
     useage();
     return;
   }
@@ -108,14 +125,55 @@ void cmd_set(SerialCommands* sender) {
   valuesDump();
   useage();
 }
+SerialCommand cmd_current_("current", cmd_current);
 
-//called for get command
-void cmd_get(SerialCommands* sender) {
+
+void cmd_period(SerialCommands* sender) {
   watch = false;
+  char* valStr = sender->Next();
+  if (valStr == NULL) {
+    sender->GetSerial()->print(F("Loop period (ms): "));
+    sender->GetSerial()->println(d.checkPeriodMs, DEC);
+    useage();
+    return;
+  }
+
+  int val = atoi(valStr);
+  if (val < 1) {
+    sender->GetSerial()->println(F("Nonsensical value - ignoring"));
+  } else {
+    d.checkPeriodMs = val;
+    EEPROM.put(0, d);
+  }
   valuesHeader();
   valuesDump();
   useage();
 }
+SerialCommand cmd_period_("current", cmd_period);
+
+
+void cmd_count(SerialCommands* sender) {
+  watch = false;
+  char* valStr = sender->Next();
+  if (valStr == NULL) {
+    sender->GetSerial()->print(F("Count max: "));
+    sender->GetSerial()->println(d.thresholdCountMax, DEC);
+    useage();
+    return;
+  }
+
+  int val = atoi(valStr);
+  if (val < d.thresholdOff) {
+    sender->GetSerial()->println(F("Count max must be greater than the off threshold"));
+  } else {
+    d.thresholdCountMax = val;
+    EEPROM.put(0, d);
+  }
+  valuesHeader();
+  valuesDump();
+  useage();
+}
+SerialCommand cmd_count_("current", cmd_count);
 
 //called for watch command
 void cmd_watch(SerialCommands* sender) {
@@ -124,11 +182,13 @@ void cmd_watch(SerialCommands* sender) {
   valuesHeader();
   watch = true;
 }
+SerialCommand cmd_watch_("watch", cmd_watch);
 
 void cmd_stop_watch(SerialCommands* sender) {
   watch = false;
   useage();
 }
+SerialCommand cmd_stop_watch_("x", cmd_stop_watch, true);
 
 void cmd_cal(SerialCommands* sender) {
   watch = false;
@@ -141,7 +201,7 @@ void cmd_cal(SerialCommands* sender) {
     sender->GetSerial()->print(".");
     delay(250);
   }
-  calVal = calVal * 1.1; // 110% truncated down
+  calVal = calVal * 1.05; // 105% truncated down
   sender->GetSerial()->print(F("\r\nComplete. New value is ["));
   sender->GetSerial()->print(calVal);
   sender->GetSerial()->println(F("]"));
@@ -151,11 +211,14 @@ void cmd_cal(SerialCommands* sender) {
   valuesDump();
   useage();
 }
+SerialCommand cmd_cal_("cal", cmd_cal);
 
 void cmd_setOn(SerialCommands* sender) {
   watch = false;
   char* valStr = sender->Next();
   if (valStr == NULL) {
+    sender->GetSerial()->print(F("Count on threshold: "));
+    sender->GetSerial()->println(d.thresholdOn, DEC);
     useage();
     return;
   }
@@ -171,11 +234,14 @@ void cmd_setOn(SerialCommands* sender) {
   valuesDump();
   useage();
 }
+SerialCommand cmd_setOn_("on", cmd_setOn);
 
 void cmd_setOff(SerialCommands* sender) {
   watch = false;
   char* valStr = sender->Next();
   if (valStr == NULL) {
+    sender->GetSerial()->print(F("Count off threshold: "));
+    sender->GetSerial()->println(d.thresholdOff, DEC);
     useage();
     return;
   }
@@ -191,6 +257,7 @@ void cmd_setOff(SerialCommands* sender) {
   valuesDump();
   useage();
 }
+SerialCommand cmd_setOff_("off", cmd_setOff);
 
 void cmd_setDef(SerialCommands* sender) {
   setDefaults();
@@ -198,6 +265,7 @@ void cmd_setDef(SerialCommands* sender) {
   valuesDump();
   useage();
 }
+SerialCommand cmd_setDef_("def", cmd_setDef);
 
 void cmd_setFOff(SerialCommands* sender) {
   force = false;
@@ -205,6 +273,7 @@ void cmd_setFOff(SerialCommands* sender) {
   valuesDump();
   useage();
 }
+SerialCommand cmd_setFOff_("foff", cmd_setFOff);
 
 void cmd_setFOn(SerialCommands* sender) {
   force = true;
@@ -212,18 +281,7 @@ void cmd_setFOn(SerialCommands* sender) {
   valuesDump();
   useage();
 }
-
-//Note: Commands are case sensitive
-SerialCommand cmd_set_("set", cmd_set);
-SerialCommand cmd_get_("get", cmd_get);
-SerialCommand cmd_watch_("watch", cmd_watch);
-SerialCommand cmd_stop_watch_("x", cmd_stop_watch, true);
-SerialCommand cmd_cal_("cal", cmd_cal);
-SerialCommand cmd_setOn_("on", cmd_setOn);
-SerialCommand cmd_setOff_("off", cmd_setOff);
-SerialCommand cmd_setDef_("def", cmd_setDef);
 SerialCommand cmd_setFOn_("fon", cmd_setFOn);
-SerialCommand cmd_setFOff_("foff", cmd_setFOff);
 
 
 void setup() {
@@ -234,7 +292,7 @@ void setup() {
   pinMode(blinkPin, OUTPUT);
   pinMode(relay, OUTPUT);
   serial_commands_.SetDefaultHandler(cmd_unrecognized);
-  serial_commands_.AddCommand(&cmd_set_);
+  serial_commands_.AddCommand(&cmd_current_);
   serial_commands_.AddCommand(&cmd_get_);
   serial_commands_.AddCommand(&cmd_watch_);
   serial_commands_.AddCommand(&cmd_stop_watch_);
@@ -244,6 +302,8 @@ void setup() {
   serial_commands_.AddCommand(&cmd_setDef_);
   serial_commands_.AddCommand(&cmd_setFOn_);
   serial_commands_.AddCommand(&cmd_setFOff_);
+  serial_commands_.AddCommand(&cmd_period_);
+  serial_commands_.AddCommand(&cmd_count_);
 
   // check eeprom - see if we've been initialized before
   EEPROM.get(0, d);
@@ -266,6 +326,7 @@ void setDefaults() {
   d.thresholdOff      = defaultThresholdOff;
   d.thresholdRate     = defaultThresholdRate;
   d.adcThreshold      = defaultCurrentThreshold;
+  d.checkPeriodMs     = defaultCheckPeriodMs;
   EEPROM.put(0, d);
 }
 
@@ -276,7 +337,7 @@ void loop() {
     // set everything on
     digitalWrite(relay, HIGH);
     digitalWrite(blinkPin, HIGH);
-  } else if (lastCheck + checkPeriodMs < now) {
+  } else if (lastCheck + d.checkPeriodMs < now) {
     periodicCheck();
     lastCheck = now;
   }
