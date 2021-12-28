@@ -1,0 +1,5 @@
+{
+    "sketch": "Source\\vac\\vac.ino",
+    "configuration": "cpu=attiny85,clock=internal1",
+    "board": "attiny:avr:ATtinyX5"
+}
