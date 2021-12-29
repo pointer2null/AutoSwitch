@@ -11,11 +11,16 @@
 #define serialRX 4                     // pin 3, PB4
 #define sense    A1                    // pin 7, PB2, ADC1
 
-#define defaultThresholdRate     2     // how fast we climb when over the trigger level
-#define defaultCurrentThreshold  600   // ADC trigger level
-#define defaultThresholdCountMax 20    // max counter value - affects how long we stay on after the tool is off
-#define defaultThresholdOn       6     // count point to switch on
-#define defaultThresholdOff      10    // count point to switch on
+// 0.00488V (4.88mV) per unit on the ADC
+// 2.5V (zero current = 512) (defaul using Vcc as ref)
+// ACS712-20A has a sensitivity of 100mV/A
+// So 1A = 100mV
+// Means we should see a adc increase of around 20 per amp.
+// 1A @ 240V is 240W  
+#define defaultCurrentThreshold  520   // ADC trigger level : approx 17 counts => 200W
+#define defaultThresholdCountMax 10    // max counter value - affects how long we stay on after the tool is off
+#define defaultThresholdOn       4     // count point to switch on
+#define defaultThresholdOff      6     // count point to switch off
 #define defaultCheckPeriodMs     500   // loop poll frequency
 
 #define calPeriodMs              10000 // 10 seconds
@@ -35,7 +40,6 @@ bool blinkLed      = true;
 char serial_command_buffer_[32];
 struct Data {
   char magic[1];                       // need some way to see if the eeprom has been initialized
-  int thresholdRate;                   // how fast we climb when over the current trigger level
   int adcThreshold;                    // ADC current trigger level
   int thresholdCountMax;               // max counter value - affects how long we stay on after the tool is off
   int thresholdOn;                     // counter trigger level that turns on vac
@@ -163,7 +167,7 @@ void cmd_count(SerialCommands* sender) {
   }
 
   int val = atoi(valStr);
-  if (val < d.thresholdOff) {
+  if (val <= d.thresholdOff) {
     sender->GetSerial()->println(F("Count max must be greater than the off threshold"));
   } else {
     d.thresholdCountMax = val;
@@ -173,7 +177,7 @@ void cmd_count(SerialCommands* sender) {
   valuesDump();
   useage();
 }
-SerialCommand cmd_count_("current", cmd_count);
+SerialCommand cmd_count_("count", cmd_count);
 
 //called for watch command
 void cmd_watch(SerialCommands* sender) {
@@ -201,7 +205,7 @@ void cmd_cal(SerialCommands* sender) {
     sender->GetSerial()->print(".");
     delay(250);
   }
-  calVal = calVal * 1.05; // 105% truncated down
+  calVal += 20; // approx 200W
   sender->GetSerial()->print(F("\r\nComplete. New value is ["));
   sender->GetSerial()->print(calVal);
   sender->GetSerial()->println(F("]"));
@@ -224,7 +228,7 @@ void cmd_setOn(SerialCommands* sender) {
   }
 
   int val = atoi(valStr);
-  if (val < 1 || val > d.thresholdOff) {
+  if (val <= 1 || val >= d.thresholdOff) {
     useage();
     return;
   }
@@ -247,7 +251,7 @@ void cmd_setOff(SerialCommands* sender) {
   }
 
   int val = atoi(valStr);
-  if (val < d.thresholdOn || val > defaultThresholdCountMax) {
+  if (val <= d.thresholdOn || val >= defaultThresholdCountMax) {
     useage();
     return;
   }
@@ -324,7 +328,6 @@ void setDefaults() {
   d.thresholdCountMax = defaultThresholdCountMax;
   d.thresholdOn       = defaultThresholdOn;
   d.thresholdOff      = defaultThresholdOff;
-  d.thresholdRate     = defaultThresholdRate;
   d.adcThreshold      = defaultCurrentThreshold;
   d.checkPeriodMs     = defaultCheckPeriodMs;
   EEPROM.put(0, d);
