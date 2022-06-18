@@ -348,6 +348,7 @@ void periodicCheck() {
 
   if ((thresholdCount > d.thresholdOn) && (analogValue > d.adcThreshold)) {
     // switch on
+    thresholdCount = defaultThresholdCountMax;
     digitalWrite(relay, HIGH);
     digitalWrite(blinkPin, HIGH);
     blinkLed = true;

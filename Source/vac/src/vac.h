@@ -33,7 +33,7 @@ void periodicCheck();
 // 1A @ 240V is 240W  
 #define defaultCurrentThreshold  520   // ADC trigger level : approx 17 counts => 200W
 #define defaultThresholdCountMax 10    // max counter value - affects how long we stay on after the tool is off
-#define defaultThresholdOn       4     // count point to switch on
+#define defaultThresholdOn       3     // count point to switch on
 #define defaultThresholdOff      6     // count point to switch off
 #define defaultCheckPeriodMs     500   // loop poll frequency
 

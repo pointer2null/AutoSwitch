@@ -1,0 +1,29 @@
+Reference, Value, Footprint, Datasheet
+U1,ATtiny85-20PU,Package_DIP:DIP-8_W7.62mm_LongPads,http://ww1.microchip.com/downloads/en/DeviceDoc/atmel-2586-avr-8-bit-microcontroller-attiny25-attiny45-attiny85_datasheet.pdf
+U2,ACS712xLCTR-20A,Package_SO:SOIC-8_3.9x4.9mm_P1.27mm,http://www.allegromicro.com/~/media/Files/Datasheets/ACS712-Datasheet.ashx?la=en
+R7,220R,Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal,~
+R8,220R,Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal,~
+R4,2K2,Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal,~
+D1,1N4148,Diode_THT:D_DO-35_SOD27_P7.62mm_Horizontal,https://assets.nexperia.com/documents/data-sheet/1N4148_1N4448.pdf
+C3,1nF,Capacitor_THT:CP_Radial_Tantal_D6.0mm_P5.00mm,~
+C4,10pF,Capacitor_THT:CP_Radial_Tantal_D5.0mm_P5.00mm,~
+R3,10K,Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal,~
+C1,0.1uF,Capacitor_THT:CP_Radial_Tantal_D5.0mm_P5.00mm,~
+D6,RED LED,LED_THT:LED_D3.0mm,~
+D7,ORANGE LED,LED_THT:LED_D3.0mm,~
+Q1,BC547,Package_TO_SOT_THT:TO-92_Inline,https://www.onsemi.com/pub/Collateral/BC550-D.pdf
+R9,220R,Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal,~
+R10,1k,Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal,~
+U3,MOC3043M,Package_DIP:DIP-6_W7.62mm_LongPads,https://www.onsemi.com/pub/Collateral/MOC3043M-D.pdf
+R12,360R,Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal,~
+R11,330R,Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal,~
+C6,0.047uF 47R,Capacitor_THT:C_Rect_L16.5mm_W7.0mm_P15.00mm_MKT,~
+D9,MAC12MG,Package_TO_SOT_THT:TO-220-3_Vertical,~
+J2,RS232,Connector_JST:JST_PH_B3B-PH-K_1x03_P2.00mm_Vertical,~
+J3,ISP,Connector_JST:JST_PH_B6B-PH-K_1x06_P2.00mm_Vertical,~
+J1,Mains,Samsys:1729160,~
+K1,HE721A0510,Relay_THT:Relay_StandexMeder_DIP_LowProfile,https://standexelectronics.com/wp-content/uploads/datasheet_reed_relay_DIP.pdf
+J4,VoltFreeContact,Connector_JST:JST_PH_B2B-PH-K_1x02_P2.00mm_Vertical,~
+PS1,RAC04-05SGA,Converter_ACDC:Converter_ACDC_RECOM_RAC04-xxSGx_THT,https://www.recom-power.com/pdf/Powerline-AC-DC/RAC04-GA.pdf
+RV1,V250LA2P,Varistor:RV_Disc_D7mm_W3.9mm_P5mm,~
+JP1,Program,Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Vertical,~
